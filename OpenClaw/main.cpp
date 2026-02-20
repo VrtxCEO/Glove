@@ -3,6 +3,10 @@
 
 #include "Engine/GameApp/MainLoop.h"
 #include "ClawGameApp.h"
+#include "GloveClient.h"
+
+#include <cstdlib>
+#include <iostream>
 
 #ifdef ANDROID
 #include <jni.h>
@@ -46,5 +50,50 @@ int main(int argc, char* argv[])
 //    _CrtSetReportFile( _CRT_ASSERT, _CRTDBG_FILE_STDOUT );
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
+    const char* gloveBaseUrl = std::getenv("GLOVE_BASE_URL");
+    const char* gloveAgentKey = std::getenv("GLOVE_AGENT_KEY");
+    if (gloveBaseUrl && gloveAgentKey)
+    {
+        GloveClient glove(gloveBaseUrl, gloveAgentKey);
+        const GloveDecision startupDecision = glove.RequestAction(
+            "runtime.startup",
+            "openclaw",
+            "{\"source\":\"openclaw\"}");
+
+        if (startupDecision.type == GloveDecisionType::Deny)
+        {
+            std::cerr << "[Glove] Startup denied: " << startupDecision.reason << std::endl;
+            return 2;
+        }
+        if (startupDecision.type == GloveDecisionType::RequirePin)
+        {
+            std::cerr << "[Glove] Startup requires PIN approval. request_id="
+                      << startupDecision.requestId << std::endl;
+            const GloveRequestStatus approvalStatus = glove.WaitForApproval(startupDecision.requestId, 300, 2000);
+            if (approvalStatus == GloveRequestStatus::Approved)
+            {
+                std::cerr << "[Glove] Approval received. Continuing startup." << std::endl;
+            }
+            else if (approvalStatus == GloveRequestStatus::Denied)
+            {
+                std::cerr << "[Glove] Approval denied." << std::endl;
+                return 3;
+            }
+            else if (approvalStatus == GloveRequestStatus::Expired)
+            {
+                std::cerr << "[Glove] Approval request expired." << std::endl;
+                return 3;
+            }
+            else
+            {
+                std::cerr << "[Glove] Approval wait failed or timed out." << std::endl;
+                return 3;
+            }
+        }
+        if (startupDecision.type == GloveDecisionType::Error)
+        {
+            std::cerr << "[Glove] Startup check error; continuing without block." << std::endl;
+        }
+    }
     return RunGameEngine(argc, argv);
 }

@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "default_risk": "medium",
+  "rules": [
+    {
+      "id": "policy-deny-exec",
+      "action_prefix": "exec.",
+      "decision": "deny",
+      "reason": "Process execution is blocked by default."
+    },
+    {
+      "id": "policy-high-write",
+      "action_prefix": "file.write.",
+      "risk": "high"
+    },
+    {
+      "id": "policy-high-config",
+      "action_prefix": "config.update.",
+      "risk": "high"
+    },
+    {
+      "id": "policy-low-read",
+      "action_prefix": "file.read.",
+      "risk": "low"
+    }
+  ],
+  "blocked_targets": [
+    "C:\\Windows\\System32",
+    "/etc/shadow"
+  ]
+}

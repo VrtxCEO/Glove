@@ -86,6 +86,7 @@ else (Emscripten)
     if (WIN32)
         list(APPEND TARGET_LIBS
                 Rpcrt4
+                Winhttp
                 )
     else (WIN32)
         # TODO: Is it really important???

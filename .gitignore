@@ -32,3 +32,4 @@ Build_Release/vim.exe.stackdump
 *.iobj
 *.ipdb
 *.exp
+glove.db
