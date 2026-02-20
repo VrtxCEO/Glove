@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Glove Console</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121b2e;
+      --text: #e7edf9;
+      --muted: #a4b1cd;
+      --ok: #38b000;
+      --warn: #ffb703;
+      --danger: #d00000;
+      --accent: #3a86ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: radial-gradient(circle at top right, #152542 0%, var(--bg) 55%);
+      color: var(--text);
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid #1e2b49;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    h1, h2 { margin: 0 0 10px; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 18px; color: #c7d6f5; }
+    input, button, textarea {
+      width: 100%;
+      margin: 6px 0;
+      border-radius: 10px;
+      border: 1px solid #30426d;
+      background: #0f1830;
+      color: var(--text);
+      padding: 10px;
+      font-size: 14px;
+    }
+    button {
+      background: linear-gradient(90deg, #2d6cdf 0%, var(--accent) 100%);
+      border: 0;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 860px) { .row { grid-template-columns: 1fr 1fr; } }
+    .item {
+      border: 1px solid #2b3d65;
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+    .meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .status { font-weight: 700; }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.danger { color: var(--danger); }
+    .small { font-size: 12px; color: var(--muted); }
+    .inline { display: flex; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Glove Console</h1>
+    <img id="logo" src="/static/logo.png" alt="Glove logo" style="width:72px;height:72px;display:block;margin:8px 0;" onerror="this.style.display='none'">
+    <div class="small">Admin endpoints are locked with an admin key. OpenClaw should only have an agent key.</div>
+
+    <div class="card">
+      <h2>Access</h2>
+      <input id="adminKey" type="password" placeholder="Admin key (X-Glove-Admin-Key)">
+      <div class="inline">
+        <button id="saveKey">Save Key</button>
+        <button id="loadData">Refresh</button>
+      </div>
+      <div id="health" class="small"></div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <h2>PIN Setup / Approve</h2>
+        <input id="newPin" type="password" placeholder="Set/replace PIN">
+        <button id="setPin">Set PIN</button>
+        <hr>
+        <input id="requestId" placeholder="Request ID">
+        <input id="approvePin" type="password" placeholder="PIN">
+        <button id="approveBtn">Approve Request</button>
+        <div id="approveResult" class="small"></div>
+      </div>
+
+      <div class="card">
+        <h2>Message Reply Parser</h2>
+        <textarea id="replyBody" rows="3" placeholder="PIN &lt;request_id&gt; &lt;pin&gt;"></textarea>
+        <button id="replyBtn">Apply Reply</button>
+        <div id="replyResult" class="small"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pending Requests</h2>
+      <div id="pending"></div>
+    </div>
+
+    <div class="card">
+      <h2>Risk Keywords</h2>
+      <div class="small">If any keyword appears in action, target, or metadata, PIN approval is required.</div>
+      <textarea id="riskKeywords" rows="3" placeholder="Comma-separated keywords, e.g. delete, admin, secrets"></textarea>
+      <button id="saveRiskKeywords">Save Risk Keywords</button>
+      <div id="riskResult" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>ClawHub Extensions</h2>
+      <div class="small">Auto-discovered from the extensions folder. Enable what Glove should use.</div>
+      <div class="small">Signed install requires trusted `key_id` + detached signature.</div>
+      <input id="extUrl" placeholder="Extension ZIP URL">
+      <input id="extUrlKeyId" placeholder="Publisher key_id">
+      <textarea id="extUrlSig" rows="2" placeholder="Detached signature (base64)"></textarea>
+      <label><input id="extReplaceUrl" type="checkbox"> Replace existing on URL install</label>
+      <button id="installExtUrl">Install From URL</button>
+      <input id="extZipFile" type="file" accept=".zip">
+      <input id="extZipKeyId" placeholder="Publisher key_id">
+      <textarea id="extZipSig" rows="2" placeholder="Detached signature (base64)"></textarea>
+      <label><input id="extReplaceFile" type="checkbox"> Replace existing on ZIP upload</label>
+      <button id="installExtZip">Install ZIP</button>
+      <div id="exts"></div>
+      <div class="inline">
+        <button id="saveExts">Save Enabled</button>
+        <button id="refreshExts">Refresh Extensions</button>
+      </div>
+      <div id="extResult" class="small"></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Audit</h2>
+      <div id="audit"></div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const keyBox = el("adminKey");
+    const urlParams = new URLSearchParams(window.location.search);
+
+    function adminHeaders() {
+      return { "Content-Type": "application/json", "X-Glove-Admin-Key": keyBox.value.trim() };
+    }
+
+    async function api(path, method = "GET", body = null) {
+      const opts = { method, headers: adminHeaders() };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(path, opts);
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      if (!res.ok) throw new Error(data.detail || data.raw || `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function refresh() {
+      try {
+        const health = await fetch("/api/v1/health").then(r => r.json());
+        el("health").textContent = `health=${health.status} | notifier=${health.notifier} | pin_configured=${health.pin_configured}`;
+      } catch (e) {
+        el("health").textContent = "health unavailable";
+      }
+
+      try {
+        const pending = await api("/api/v1/admin/requests/pending");
+        el("pending").innerHTML = (pending.items || []).map(r => `
+          <div class="item">
+            <div><span class="status warn">${r.status}</span> ${r.request_id || r.id}</div>
+            <div class="meta">action=${r.action} | target=${r.target}</div>
+            <div class="meta">risk=${r.risk} | created=${r.created_at} | expires=${r.expires_at}</div>
+          </div>
+        `).join("") || '<div class="small">No pending requests.</div>';
+      } catch (e) {
+        el("pending").innerHTML = `<div class="small">Error: ${e.message}</div>`;
+      }
+
+      try {
+        const rk = await api("/api/v1/admin/risk-keywords");
+        el("riskKeywords").value = (rk.keywords || []).join(", ");
+      } catch (e) {
+        el("riskResult").textContent = `Risk keywords load error: ${e.message}`;
+      }
+
+      try {
+        const ext = await api("/api/v1/admin/extensions");
+        const installed = ext.installed || [];
+        const enabled = new Set(ext.enabled || []);
+        el("exts").innerHTML = installed.map(name => `
+          <div class="item">
+            <label><input type="checkbox" class="extChk" value="${name}" ${enabled.has(name) ? "checked" : ""}> ${name}</label>
+            <button data-ext="${name}" class="testExtBtn">Test</button>
+          </div>
+        `).join("") || '<div class="small">No extensions discovered.</div>';
+
+        document.querySelectorAll(".testExtBtn").forEach(btn => {
+          btn.onclick = async () => {
+            const id = btn.getAttribute("data-ext");
+            try {
+              const out = await api("/api/v1/admin/extensions/test", "POST", { extension_id: id });
+              el("extResult").textContent = `Test OK: ${out.extension_id}`;
+            } catch (e) {
+              el("extResult").textContent = `Test failed: ${e.message}`;
+            }
+          };
+        });
+      } catch (e) {
+        el("exts").innerHTML = `<div class="small">Error: ${e.message}</div>`;
+      }
+
+      try {
+        const audit = await api("/api/v1/admin/audit/recent");
+        el("audit").innerHTML = (audit.items || []).slice(0, 15).map(a => `
+          <div class="item">
+            <div><span class="status ${a.outcome === "approved" || a.outcome === "allow" ? "ok" : (a.outcome === "failed" || a.outcome === "deny" ? "danger" : "warn")}">${a.outcome}</span> ${a.event_type}</div>
+            <div class="meta">${a.ts}</div>
+            <div class="meta">${JSON.stringify(a.details)}</div>
+          </div>
+        `).join("") || '<div class="small">No audit entries.</div>';
+      } catch (e) {
+        el("audit").innerHTML = `<div class="small">Error: ${e.message}</div>`;
+      }
+    }
+
+    el("saveKey").onclick = () => {
+      localStorage.setItem("glove_admin_key", keyBox.value.trim());
+      refresh();
+    };
+
+    el("loadData").onclick = refresh;
+
+    el("setPin").onclick = async () => {
+      try {
+        await api("/api/v1/admin/setup-pin", "POST", { pin: el("newPin").value });
+        alert("PIN updated.");
+      } catch (e) {
+        alert(`Failed: ${e.message}`);
+      }
+    };
+
+    el("approveBtn").onclick = async () => {
+      try {
+        const out = await api("/api/v1/admin/approve-pin", "POST", {
+          request_id: el("requestId").value.trim(),
+          pin: el("approvePin").value
+        });
+        el("approveResult").textContent = `Approved: ${out.request_id}`;
+        refresh();
+      } catch (e) {
+        el("approveResult").textContent = `Failed: ${e.message}`;
+      }
+    };
+
+    el("saveExts").onclick = async () => {
+      const ids = Array.from(document.querySelectorAll(".extChk"))
+        .filter(x => x.checked)
+        .map(x => x.value);
+      try {
+        const out = await api("/api/v1/admin/extensions/config", "POST", { enabled_ids: ids });
+        el("extResult").textContent = `Saved: ${out.enabled.join(", ") || "(none)"}`;
+      } catch (e) {
+        el("extResult").textContent = `Save failed: ${e.message}`;
+      }
+    };
+
+    el("saveRiskKeywords").onclick = async () => {
+      const raw = el("riskKeywords").value || "";
+      const keywords = raw
+        .split(",")
+        .map(x => x.trim())
+        .filter(Boolean);
+      try {
+        const out = await api("/api/v1/admin/risk-keywords/config", "POST", { keywords });
+        el("riskKeywords").value = (out.keywords || []).join(", ");
+        el("riskResult").textContent = `Saved ${out.keywords.length} keyword(s).`;
+      } catch (e) {
+        el("riskResult").textContent = `Save failed: ${e.message}`;
+      }
+    };
+
+    el("installExtUrl").onclick = async () => {
+      const url = el("extUrl").value.trim();
+      if (!url) {
+        el("extResult").textContent = "Enter a ZIP URL first.";
+        return;
+      }
+      try {
+        const out = await api("/api/v1/admin/extensions/install-url", "POST", {
+          url,
+          key_id: el("extUrlKeyId").value.trim(),
+          signature_b64: el("extUrlSig").value.trim(),
+          replace_existing: el("extReplaceUrl").checked
+        });
+        el("extResult").textContent = `Installed from URL: ${out.extension_id}`;
+        refresh();
+      } catch (e) {
+        el("extResult").textContent = `URL install failed: ${e.message}`;
+      }
+    };
+
+    el("installExtZip").onclick = async () => {
+      const fileInput = el("extZipFile");
+      if (!fileInput.files || !fileInput.files.length) {
+        el("extResult").textContent = "Choose a .zip file first.";
+        return;
+      }
+      const fd = new FormData();
+      fd.append("file", fileInput.files[0]);
+      fd.append("key_id", el("extZipKeyId").value.trim());
+      fd.append("signature_b64", el("extZipSig").value.trim());
+      fd.append("replace_existing", el("extReplaceFile").checked ? "true" : "false");
+      try {
+        const res = await fetch("/api/v1/admin/extensions/install-upload", {
+          method: "POST",
+          headers: { "X-Glove-Admin-Key": keyBox.value.trim() },
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        el("extResult").textContent = `Installed from ZIP: ${data.extension_id}`;
+        refresh();
+      } catch (e) {
+        el("extResult").textContent = `ZIP install failed: ${e.message}`;
+      }
+    };
+
+    el("refreshExts").onclick = refresh;
+
+    el("replyBtn").onclick = async () => {
+      try {
+        const out = await api("/api/v1/admin/message-reply", "POST", { body: el("replyBody").value });
+        el("replyResult").textContent = `Approved: ${out.request_id}`;
+        refresh();
+      } catch (e) {
+        el("replyResult").textContent = `Failed: ${e.message}`;
+      }
+    };
+
+    keyBox.value = localStorage.getItem("glove_admin_key") || "";
+    const prefillRequestId = urlParams.get("request_id");
+    if (prefillRequestId) {
+      el("requestId").value = prefillRequestId;
+      el("approveResult").textContent = `Ready to approve request: ${prefillRequestId}`;
+    }
+    refresh();
+  </script>
+</body>
+</html>

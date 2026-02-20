@@ -1,0 +1,5 @@
+{
+  "publishers": {
+    "example-dev": "REPLACE_WITH_BASE64_ED25519_PUBLIC_KEY"
+  }
+}

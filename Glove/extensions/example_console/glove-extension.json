@@ -1,0 +1,7 @@
+{
+  "name": "example_console",
+  "notify": {
+    "command": "python",
+    "args": ["notify.py"]
+  }
+}
