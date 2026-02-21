@@ -49,6 +49,9 @@
       font-weight: 600;
       cursor: pointer;
     }
+    button.danger {
+      background: linear-gradient(90deg, #8b0000 0%, var(--danger) 100%);
+    }
     .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
     @media (min-width: 860px) { .row { grid-template-columns: 1fr 1fr; } }
     .item {
@@ -90,7 +93,10 @@
         <hr>
         <input id="requestId" placeholder="Request ID">
         <input id="approvePin" type="password" placeholder="PIN">
-        <button id="approveBtn">Approve Request</button>
+        <div class="inline">
+          <button id="approveBtn">Approve Request</button>
+          <button id="declineBtn" class="danger">Decline Request</button>
+        </div>
         <div id="approveResult" class="small"></div>
       </div>
 
@@ -178,8 +184,26 @@
             <div><span class="status warn">${r.status}</span> ${r.request_id || r.id}</div>
             <div class="meta">action=${r.action} | target=${r.target}</div>
             <div class="meta">risk=${r.risk} | created=${r.created_at} | expires=${r.expires_at}</div>
+            <div class="inline">
+              <button class="declinePendingBtn danger" data-request-id="${r.request_id || r.id}">Decline</button>
+            </div>
           </div>
         `).join("") || '<div class="small">No pending requests.</div>';
+        document.querySelectorAll(".declinePendingBtn").forEach(btn => {
+          btn.onclick = async () => {
+            const requestId = btn.getAttribute("data-request-id");
+            try {
+              const out = await api("/api/v1/admin/deny-request", "POST", {
+                request_id: requestId,
+                reason: "declined_by_user"
+              });
+              el("approveResult").textContent = `Denied: ${out.request_id}`;
+              refresh();
+            } catch (e) {
+              el("approveResult").textContent = `Deny failed: ${e.message}`;
+            }
+          };
+        });
       } catch (e) {
         el("pending").innerHTML = `<div class="small">Error: ${e.message}</div>`;
       }
@@ -257,6 +281,19 @@
         refresh();
       } catch (e) {
         el("approveResult").textContent = `Failed: ${e.message}`;
+      }
+    };
+
+    el("declineBtn").onclick = async () => {
+      try {
+        const out = await api("/api/v1/admin/deny-request", "POST", {
+          request_id: el("requestId").value.trim(),
+          reason: "declined_by_user"
+        });
+        el("approveResult").textContent = `Denied: ${out.request_id}`;
+        refresh();
+      } catch (e) {
+        el("approveResult").textContent = `Deny failed: ${e.message}`;
       }
     };
 

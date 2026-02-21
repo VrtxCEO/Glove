@@ -21,6 +21,7 @@ from .models import (
     AgentDecisionOut,
     AgentRequestIn,
     ApprovePinIn,
+    DenyRequestIn,
     ExtensionConfigIn,
     ExtensionInstallUrlIn,
     ExtensionTestIn,
@@ -342,6 +343,26 @@ def approve_pin(payload: ApprovePinIn) -> Dict[str, Any]:
         request["target"],
     )
     return {"status": "approved", "approval_token": approval_token, "request_id": payload.request_id}
+
+
+@app.post("/api/v1/admin/deny-request", dependencies=[Depends(_require_admin)])
+def deny_request(payload: DenyRequestIn) -> Dict[str, Any]:
+    request = db.get_request(payload.request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="request_not_found")
+    if request["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"request_{request['status']}")
+
+    db.set_request_status(payload.request_id, "denied")
+    db.append_audit(
+        "deny_request",
+        "denied",
+        {"reason": payload.reason},
+        payload.request_id,
+        request["action"],
+        request["target"],
+    )
+    return {"status": "denied", "request_id": payload.request_id}
 
 
 @app.post("/api/v1/admin/message-reply", dependencies=[Depends(_require_admin)])

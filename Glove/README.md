@@ -88,7 +88,7 @@ UI auto-fills request ID from query string.
 Main features:
 
 - admin key entry
-- PIN setup and approval
+- PIN setup, approval, and decline
 - pending request list
 - audit viewer
 - risk keyword editor
@@ -109,6 +109,7 @@ Admin endpoints (`X-Glove-Admin-Key`):
 
 - `POST /api/v1/admin/setup-pin`
 - `POST /api/v1/admin/approve-pin`
+- `POST /api/v1/admin/deny-request`
 - `GET /api/v1/admin/requests/pending`
 - `GET /api/v1/admin/audit/recent`
 - `GET /api/v1/admin/risk-keywords`
@@ -202,6 +203,50 @@ Open UI:
 
 - `http://127.0.0.1:8088/`
 
+## OpenClaw CLI Connector (Recommended)
+
+For users running the npm/pnpm OpenClaw CLI runtime, use the bundled plugin connector.
+
+What it does:
+
+- installs `glove-guard` plugin to `~/.openclaw/extensions/glove-guard`
+- configures OpenClaw to load it
+- sets plugin config:
+  - Glove base URL
+  - Glove agent key
+- restarts OpenClaw gateway
+
+Run from `OpenClaw/Glove`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_openclaw_glove_guard.ps1
+```
+
+Optional explicit values:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_openclaw_glove_guard.ps1 `
+  -GloveBaseUrl "http://127.0.0.1:8088" `
+  -GloveAgentKey "<your_glove_agent_key>"
+```
+
+Then open OpenClaw dashboard:
+
+```powershell
+openclaw dashboard --no-open
+```
+
+### Minimal End-User Setup Flow
+
+1. Install OpenClaw CLI.
+2. Clone/download Glove.
+3. Run:
+   - `powershell -ExecutionPolicy Bypass -File .\setup_glove_windows.ps1`
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\run_glove.ps1`
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\install_openclaw_glove_guard.ps1`
+4. Open Glove UI at `http://127.0.0.1:8088/`, enter admin key, set PIN.
+5. Use OpenClaw normally. Tool calls are gated through Glove.
+
 ## Build Standalone Bundle
 
 ```powershell
@@ -220,6 +265,7 @@ Output:
 3. Use HTTPS/reverse proxy for remote access.
 4. Keep `.env.local.ps1` private.
 5. Keep signatures enabled for extension installs.
+6. Do not commit API keys, admin keys, agent keys, or `glove.db`.
 
 ## License
 

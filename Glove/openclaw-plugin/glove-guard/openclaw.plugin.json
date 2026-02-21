@@ -1,0 +1,26 @@
+{
+  "id": "glove-guard",
+  "name": "Glove Guard",
+  "description": "Routes tool-call approvals through Glove before execution.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean", "default": true },
+      "baseUrl": { "type": "string", "default": "http://127.0.0.1:8088" },
+      "agentKey": { "type": "string" },
+      "pollIntervalMs": { "type": "number", "minimum": 250, "maximum": 10000, "default": 1500 },
+      "pollTimeoutMs": { "type": "number", "minimum": 2000, "maximum": 600000, "default": 300000 },
+      "includeTools": { "type": "array", "items": { "type": "string" }, "default": [] },
+      "excludeTools": { "type": "array", "items": { "type": "string" }, "default": [] }
+    }
+  },
+  "uiHints": {
+    "enabled": { "label": "Enable Glove Guard" },
+    "baseUrl": { "label": "Glove Base URL", "placeholder": "http://127.0.0.1:8088" },
+    "agentKey": { "label": "Glove Agent Key", "sensitive": true },
+    "pollIntervalMs": { "label": "Poll Interval (ms)" },
+    "pollTimeoutMs": { "label": "Approval Timeout (ms)" }
+  }
+}

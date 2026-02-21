@@ -1,6 +1,10 @@
 .venv/
+.venv-build/
 __pycache__/
 *.pyc
+glove.spec
+build/
+dist/
 glove.db
 .env
 .env.local.ps1

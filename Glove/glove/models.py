@@ -24,6 +24,11 @@ class ApprovePinIn(BaseModel):
     pin: str = Field(min_length=4, max_length=32)
 
 
+class DenyRequestIn(BaseModel):
+    request_id: str
+    reason: str = Field(default="declined_by_user", min_length=1, max_length=200)
+
+
 class SetupPinIn(BaseModel):
     pin: str = Field(min_length=4, max_length=32)
 
